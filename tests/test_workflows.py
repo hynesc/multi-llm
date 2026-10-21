@@ -93,3 +93,25 @@ async def test_no_usable_candidates_returns_bad_gateway(tmp_path, failed):
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
         response = await client.post("/v1/chat/completions", json={"model": "bon/test", "messages": [{"role": "user", "content": "hello"}]})
     assert response.status_code == 502
+
+
+async def test_invalid_judge_can_fall_back_to_a_cautious_answer(tmp_path):
+    from bon_llm.schemas import ChatCompletionRequest
+
+    cautious_answer = "I can't describe a file you haven't shared. Please upload it so I can help."
+
+    class MissingFileProvider(FakeProvider):
+        async def chat_completion(self, payload):
+            if payload["model"] in {"candidate-a", "candidate-b"}:
+                content = cautious_answer if payload["model"] == "candidate-a" else "It contains sales data."
+                return {"choices": [{"message": {"content": content}}]}
+            return await super().chat_completion(payload)
+
+    engine = BestOfNEngine(workflow_config(tmp_path), MissingFileProvider(judge_content="invalid JSON"))
+    result = await engine.run_strategy(
+        "bon/test",
+        ChatCompletionRequest(model="bon/test", messages=[{"role": "user", "content": "What is in my file?"}]),
+    )
+
+    assert result["selection_source"] == "fallback"
+    assert result["winner"].content == cautious_answer

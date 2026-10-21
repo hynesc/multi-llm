@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from bon_llm.config import CandidateConfig, JudgeConfig, SamplingConfig, StrategyConfig
 from bon_llm.engine import (
     CandidateResult,
@@ -82,3 +84,19 @@ def test_heuristic_prefers_non_empty_completed_answer() -> None:
     failed = CandidateResult(2, "local", "c", {}, None, "failed", 0.1)
 
     assert heuristic_select([empty, good, failed]).index == 1
+
+
+@pytest.mark.parametrize("opening", ["I can't", "I cannot", "I'm sorry, I can't", "I'm unable to"])
+def test_fallback_does_not_penalize_missing_information_or_refusal_phrases(opening: str) -> None:
+    cautious = CandidateResult(
+        0, "local", "a", {},
+        {"choices": [{"message": {"content": f"{opening} describe a file you haven't shared. Please upload it first."}}]},
+        None, 0.1,
+    )
+    guess = CandidateResult(
+        1, "local", "b", {},
+        {"choices": [{"message": {"content": "The file contains quarterly sales."}}]},
+        None, 0.1,
+    )
+
+    assert heuristic_select([cautious, guess]) is cautious

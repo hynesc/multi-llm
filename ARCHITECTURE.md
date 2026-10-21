@@ -31,7 +31,9 @@ The service does not persist conversations or generated responses. Candidate res
 
 Candidate HTTP calls run concurrently through `asyncio.gather`; the server has no global inference semaphore. Provider HTTP retries are distinct from judge-selection fallback. Candidate sampling overlays request parameters with strategy settings and then candidate settings. Judge sampling is separate.
 
-The synthetic model ID is retained in the response, while returned token usage comes only from the winner's upstream response. It excludes other candidates and the judge. The fallback uses completion/nonempty/refusal/length heuristics and does not establish factual correctness. The proxy is stateless across chat requests: clients such as WebUI supply conversation history in `messages`.
+The default judge rubric favors correctness, supported claims, and appropriate uncertainty. It permits clarification and appropriate refusals while discouraging fabricated details and unnecessary refusals. A custom `judge.prompt` replaces that default rubric.
+
+The synthetic model ID is retained in the response, while returned token usage comes only from the winner's upstream response. It excludes other candidates and the judge. The fallback uses completion, nonempty-content, and bounded-length heuristics, with no phrase-based refusal penalty. It cannot assess factual correctness or determine whether a refusal is justified. The proxy is stateless across chat requests: clients such as WebUI supply conversation history in `messages`.
 
 ## Deployment boundaries
 

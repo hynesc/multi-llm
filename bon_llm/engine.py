@@ -209,8 +209,12 @@ def seed_for_index(seed: int | None, index: int) -> int:
 
 def build_judge_prompt(messages: list[Any], candidates: list[CandidateResult], custom: str | None) -> str:
     rubric = custom or (
-        "Choose the best assistant reply. Favor correctness, relevance, instruction-following, "
-        "specificity, and completeness. Penalize hallucinations, refusals, and empty answers."
+        "Choose the best assistant reply. Favor correctness, supported claims, relevance, "
+        "and instruction-following. Prefer clear, specific answers when the available information "
+        "supports them. Acknowledge uncertainty or missing information and ask for clarification "
+        "when needed. Do not penalize an answer merely for expressing uncertainty, declining to "
+        "speculate, or appropriately refusing a request. Penalize unsupported claims, fabricated "
+        "details, empty answers, and unnecessary refusals when a supported answer is available."
     )
     conversation = json.dumps([message.model_dump() for message in messages], ensure_ascii=True)
     candidate_blocks = [
@@ -250,9 +254,7 @@ def _heuristic_score(candidate: CandidateResult) -> tuple[int, int, int]:
     content = candidate.content.strip()
     completed = 1 if candidate.response is not None else 0
     non_empty = 1 if content else 0
-    lowered = content.lower()
-    refusal_penalty = -1 if any(marker in lowered for marker in ("i can't", "i cannot", "i'm sorry", "unable to")) else 0
-    return (completed + non_empty + refusal_penalty, non_empty, min(len(content), 4000))
+    return (completed + non_empty, non_empty, min(len(content), 4000))
 
 
 def build_response(model_name: str, upstream_response: dict[str, Any], content: str) -> ChatCompletionResponse:

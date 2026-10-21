@@ -87,7 +87,7 @@ Tests cover candidate expansion, selection and fallback, configuration, provider
 
 Best-of-N usually requires N candidate generations plus a judging call for each request. All candidates finish before selection. `stream: true` sends the completed winner as an SSE response after selection; it is not token-by-token generation.
 
-A judge can be biased or wrong, and the fallback heuristic favors nonempty completed answers without establishing correctness. This project demonstrates the selection mechanism; it makes no measured claim of improved answer quality.
+The default judge rubric favors correctness, supported claims, and appropriate uncertainty, including clarification or refusal when warranted. A judge can still be biased or wrong. The fallback heuristic favors nonempty completed answers without penalizing refusal phrases or establishing correctness. This project demonstrates the selection mechanism; it makes no measured claim of improved answer quality.
 
 The proxy is intended for trusted local use and has no inbound authentication, rate limiting, or global generation limit. Text chat is the supported workflow. Returned usage reflects only the selected upstream response, not total strategy cost. Configured cloud providers receive prompts and may incur charges.
 

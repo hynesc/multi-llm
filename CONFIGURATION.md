@@ -117,6 +117,8 @@ strategies:
 | `judge.prompt` | Optional replacement rubric, combined with the conversation and candidate responses. |
 | `judge.sampling` | Judge temperature, top-p, and max-token settings. |
 
+The default judge rubric favors correctness and supported claims, permits appropriate uncertainty, clarification, and refusals, and discourages fabrication and unnecessary refusals. `judge.prompt` replaces this rubric if supplied. If judging fails, fallback ranks completed, nonempty answers using bounded length as a tie-breaker; it does not penalize refusal phrases or establish which answer is correct.
+
 Fixed counts are allocated first. Remaining slots are split by normalized weights, rounded down, then assigned by largest fractional remainders. For example, `n: 5` with one fixed slot plus weights 3 and 1 produces 1 fixed, 3 heavy, and 1 light candidate. Give an entry either `count` or `weight`; a supplied `count` makes its weight irrelevant. Counts exceeding N, or fixed-only lists that fail to fill N, are rejected during configuration validation.
 
 Candidate sampling precedence is **request values → strategy sampling → candidate sampling**; later values win. Incoming `max_completion_tokens` is normalized to `max_tokens` before these overrides are applied. Explicit request seeds become `seed + candidate index`; otherwise each candidate gets a random seed. Judge sampling is configured separately. The supported sampling fields are `temperature`, `top_p`, and `max_tokens`; timeouts belong to providers.
