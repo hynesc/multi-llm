@@ -1,17 +1,8 @@
 # Pseudo-model configuration and Open WebUI setup
 
-## The three layers
+YAML strategy names such as `bon/llama3.1` are **pseudo-model IDs**, not Ollama weights or Modelfiles. Open WebUI discovers them through `GET /v1/models` and submits chats to `/v1/chat/completions`. The proxy calls Ollama's OpenAI-compatible `/v1` API, not its native `/api/chat` endpoint.
 
-```mermaid
-flowchart TB
-    UI[Open WebUI] -->|OpenAI-compatible /v1 API| Proxy[Multi-LLM proxy]
-    YAML[YAML strategy definitions] -.-> Proxy
-    Proxy -->|Candidate and judge calls| Ollama[Ollama /v1 API]
-```
-
-A strategy name such as `bon/llama3.1` is a **pseudo-model ID**, not a model downloaded into Ollama or an Ollama Modelfile. The proxy publishes strategy IDs through `GET /v1/models`. When Open WebUI sends a chat completion using one of those IDs, the engine looks up its strategy, generates N candidates, asks the configured judge to select an answer, and returns the winner under the requested pseudo-model ID.
-
-The proxy's provider layer calls Ollama's OpenAI-compatible API. It does not use Ollama's native `/api/chat` endpoint. Upstream behavior is documented in [Ollama's compatibility guide](https://docs.ollama.com/api/openai-compatibility).
+See [architecture](ARCHITECTURE.md) for generation/selection flow and [Ollama's compatibility guide](https://docs.ollama.com/api/openai-compatibility) for upstream behavior.
 
 ## Configuration files and lifecycle
 
@@ -25,9 +16,9 @@ The proxy's provider layer calls Ollama's OpenAI-compatible API. It does not use
 | `BON_CONFIG_PATH` | Selects a YAML file when no CLI `--config` is supplied. Defaults to `config/config.yaml` relative to the process working directory. |
 | `OLLAMA_BASE_URL` | Overrides the example provider endpoint because its `base_url_env` names this variable. |
 
-`--config` takes precedence over `BON_CONFIG_PATH`. YAML is read once at API startup; restart the proxy after edits. There is no live reload, automatic model pull, or implicit YAML environment-variable interpolation. Provider-specific `base_url_env` and `api_key_env` explicitly select environment variables.
+`--config` overrides `BON_CONFIG_PATH`. YAML loads once at startup; restart after edits. There is no live reload, automatic model pull, or implicit variable interpolation. `base_url_env` and `api_key_env` explicitly name environment overrides.
 
-The Python process does not automatically source `.env`. To use one in a host run:
+The Python process reads exported variables. To use `.env` on the host:
 
 ```bash
 cp .env.example .env
@@ -38,7 +29,7 @@ set +a
 bon serve
 ```
 
-Compose reads `.env` for substitution. Its proxy service explicitly loads `/app/config/config.yaml` from the mounted `./config` directory; an unrelated host `BON_CONFIG_PATH` does not override that service setting. Additional provider keys must also be forwarded in the service environment, not merely written to `.env`.
+Compose uses `.env` for substitution and loads `/app/config/config.yaml` from `./config`. Its fixed path overrides a host `BON_CONFIG_PATH`. Forward additional provider keys through the service environment; writing them to `.env` alone does not inject them.
 
 ## Providers
 
@@ -60,9 +51,9 @@ providers:
 | `timeout_seconds` | Provider HTTP timeout, default 120 seconds; also applies to its judge calls. |
 | `max_retries` | Number of retries after the first attempt, default 2. The sample Ollama provider uses 1. |
 
-Use matching provider names in candidates and judges. The loader validates these references. A model name is sent to the provider as configured; startup does not check that the model exists. The HTTP client retries HTTP errors and invalid JSON responses with exponential backoff. An invalid judge selection itself triggers fallback rather than another judge-generation loop.
+Candidate/judge provider names must exist. Model availability is checked on request, not startup. HTTP and invalid-JSON failures retry with exponential backoff; invalid judge selections trigger fallback.
 
-Credentials presented by Open WebUI to the local proxy are separate from upstream provider credentials. The proxy does not authenticate incoming API keys. Its placeholder key is not an Ollama credential.
+The proxy ignores incoming API keys. WebUI's placeholder key is separate from upstream provider credentials.
 
 ## Pseudo-models and model pools
 
@@ -117,17 +108,17 @@ strategies:
 | `judge.prompt` | Optional replacement rubric, combined with the conversation and candidate responses. |
 | `judge.sampling` | Judge temperature, top-p, and max-token settings. |
 
-The default judge rubric favors correctness and supported claims, permits appropriate uncertainty, clarification, and refusals, and discourages fabrication and unnecessary refusals. `judge.prompt` replaces this rubric if supplied. If judging fails, fallback ranks completed, nonempty answers using bounded length as a tie-breaker; it does not penalize refusal phrases or establish which answer is correct.
+The default rubric favors supported claims, appropriate uncertainty, clarification, and warranted refusals. It discourages fabrication and unnecessary refusals. `judge.prompt` replaces it. See [selection behavior](ARCHITECTURE.md#request-flow) for fallback criteria and limits.
 
-Fixed counts are allocated first. Remaining slots are split by normalized weights, rounded down, then assigned by largest fractional remainders. For example, `n: 5` with one fixed slot plus weights 3 and 1 produces 1 fixed, 3 heavy, and 1 light candidate. Give an entry either `count` or `weight`; a supplied `count` makes its weight irrelevant. Counts exceeding N, or fixed-only lists that fail to fill N, are rejected during configuration validation.
+Allocate fixed counts first, then divide remaining slots by normalized weights: round down and distribute leftovers by largest fractional remainder. With `n: 5`, one fixed slot and weights 3:1 produce 1 fixed, 3 heavy, and 1 light candidate. Use `count` or `weight` per entry; `count` takes precedence. Configuration rejects counts above N and fixed-only lists that underfill N.
 
-Candidate sampling precedence is **request values → strategy sampling → candidate sampling**; later values win. Incoming `max_completion_tokens` is normalized to `max_tokens` before these overrides are applied. Explicit request seeds become `seed + candidate index`; otherwise each candidate gets a random seed. Judge sampling is configured separately. The supported sampling fields are `temperature`, `top_p`, and `max_tokens`; timeouts belong to providers.
+Sampling precedence is **request → strategy → candidate**; later values win. The proxy normalizes incoming `max_completion_tokens` to `max_tokens` first. Explicit seeds become `seed + candidate index`; otherwise seeds are random. Judge sampling is separate. Supported fields are `temperature`, `top_p`, and `max_tokens`; timeouts belong to providers.
 
-Only configured strategies appear in discovery. Raw upstream model IDs are not automatically passed through. For a single-call strategy, use `n: 1` and one candidate; a judge definition is still required by configuration, but selection skips judging when only one usable response exists.
+Discovery lists configured strategies only. For a single-call strategy use `n: 1` and one candidate; configuration still requires a judge, but selection skips it when one usable response exists.
 
 ## Connect Open WebUI
 
-Use an **OpenAI-compatible connection** to this proxy. Adding it as a native Ollama connection uses the wrong protocol. In Open WebUI, open **Settings → Admin → Connections → Manage OpenAI API Connections**, add the base URL appropriate to the deployment below, use a placeholder key if required, verify, and save. Then select `bon/llama3.1` or `bon-pool/general` from the model picker. See the upstream [connection guide](https://docs.openwebui.com/getting-started/quick-start/connect-a-provider/starting-with-openai-compatible/).
+In Open WebUI, open **Settings → Admin → Connections → Manage OpenAI API Connections**. Add an **OpenAI-compatible** connection using the URL below and a placeholder key if required; verify and save. Select `bon/llama3.1` or `bon-pool/general` in the model picker. See the upstream [connection guide](https://docs.openwebui.com/getting-started/quick-start/connect-a-provider/starting-with-openai-compatible/).
 
 | Deployment | Open WebUI's proxy base URL | Required binding/network |
 | --- | --- | --- |
@@ -136,15 +127,15 @@ Use an **OpenAI-compatible connection** to this proxy. Adding it as a native Oll
 | WebUI in Docker, proxy on host | `http://host.docker.internal:8000/v1` | Start proxy with `bon serve --host 0.0.0.0`; on Linux add host-gateway mapping to WebUI. Restrict host access. |
 | WebUI on another machine | `http://<proxy-host>:8000/v1` | A reachable proxy interface or private reverse proxy/tunnel. The proxy has no inbound authentication. |
 
-The URL is resolved by the **Open WebUI backend**, not by the browser. `localhost` inside its container refers to that container. A host service bound only to `127.0.0.1` is not reachable through a Docker bridge just by changing the hostname.
+The **WebUI backend** resolves this URL. Its container's `localhost` refers to itself; a host service must accept Docker-bridge connections, not just loopback.
 
-The Compose stack initializes WebUI with the proxy's OpenAI connection and disables its direct Ollama integration. A separately configured direct Ollama connection bypasses this project's candidate selection. WebUI persists connection settings in its data volume, so existing installations may require updating/disabling connections through the admin UI even after Compose environment variables change. Do not delete the volume just to refresh a connection. See [Open WebUI's environment reference](https://docs.openwebui.com/reference/env-configuration/).
+Compose initializes WebUI with the proxy connection and disables direct Ollama integration, which would bypass selection. Existing WebUI installations may retain saved connections despite Compose edits: update them in the admin UI, preserving the data volume. See the [environment reference](https://docs.openwebui.com/reference/env-configuration/).
 
 ## Docker-to-Ollama networking
 
 The supplied Compose stack contains the proxy and Open WebUI; it does not start Ollama. The default proxy-container endpoint is `http://host.docker.internal:11434/v1`, with Linux `host-gateway` mapping.
 
-Host Ollama must accept connections on a Docker-reachable interface. For a manual server, an example is `OLLAMA_HOST=0.0.0.0:11434 ollama serve`, with firewall access restricted to the intended clients. An already-running desktop app or service needs its own environment configuration and restart; do not start a second conflicting server. See [Ollama's server configuration guidance](https://docs.ollama.com/faq#how-do-i-configure-ollama-server).
+Host Ollama must listen on a Docker-reachable interface. For a manual server, use `OLLAMA_HOST=0.0.0.0:11434 ollama serve` with firewall access restricted to intended clients. For an existing app/service, configure its environment and restart it; avoid a second server. See [Ollama's guidance](https://docs.ollama.com/faq#how-do-i-configure-ollama-server).
 
 For another machine or container, set `OLLAMA_BASE_URL` to that reachable provider URL including `/v1`. The host port bindings `127.0.0.1:8000` and `127.0.0.1:3000` control browser/host access; containers on the Compose network use their service ports directly.
 
@@ -175,7 +166,7 @@ curl -fsS http://localhost:8000/v1/chat/completions \
   -d '{"model":"bon/llama3.1","messages":[{"role":"user","content":"Say hello in one sentence."}]}'
 ```
 
-`/healthz` proves that the API is running, not that Ollama is reachable. A successful discovery call proves configuration loaded; the completion call checks actual candidate/judge inference.
+Health checks the API process; discovery checks loaded strategies; a completion checks live candidate/judge inference.
 
 | Symptom | Check |
 | --- | --- |
