@@ -51,7 +51,6 @@ WebUI opens at `http://localhost:3000`. The stack starts the proxy and WebUI; Ol
 | --- | --- |
 | [Configuration](CONFIGURATION.md) | Pseudo-model YAML, credentials, model downloads, WebUI, networking, and troubleshooting. |
 | [Architecture](ARCHITECTURE.md) | Request flow, selection/fallback, API behavior, and persistence. |
-| [Publishing](PUBLISHING.md) | First GitHub push. |
 
 ## Limits
 
