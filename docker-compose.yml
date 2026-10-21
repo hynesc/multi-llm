@@ -1,0 +1,28 @@
+services:
+  bon-llm:
+    build: .
+    environment:
+      BON_CONFIG_PATH: /app/config/config.yaml
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434/v1}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./config:/app/config:ro
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    depends_on:
+      - bon-llm
+    environment:
+      OPENAI_API_BASE_URL: http://bon-llm:8000/v1
+      OPENAI_API_KEY: local-placeholder
+    ports:
+      - "127.0.0.1:3000:8080"
+    volumes:
+      - open-webui:/app/backend/data
+
+volumes:
+  open-webui:
