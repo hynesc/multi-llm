@@ -2,6 +2,10 @@
 
 An OpenAI-compatible chat proxy that generates several candidate responses, asks a judge model to select one, and returns the winner. It supports repeated sampling from one model and pools of different models through configurable provider endpoints.
 
+## Implementation and setup guides
+
+[CONFIGURATION.md](CONFIGURATION.md) covers pseudo-model YAML, all effective fields, sampling precedence, Ollama model preparation, Open WebUI connection settings, Docker/host addresses, restart behavior, persistence, and troubleshooting. [ARCHITECTURE.md](ARCHITECTURE.md) maps the request flow to code.
+
 ## Features
 
 - Concurrent candidate generation with fixed counts or proportional model weights.
@@ -40,7 +44,7 @@ curl http://127.0.0.1:8000/v1/chat/completions \
   -d '{"model":"bon/llama3.1","messages":[{"role":"user","content":"Explain best-of-N selection in two sentences."}]}'
 ```
 
-For Open WebUI running on the host, add an OpenAI-compatible connection with base URL `http://127.0.0.1:8000/v1`. The local proxy does not validate API keys; use a placeholder if the client requires one.
+For Open WebUI running on the host, add an OpenAI-compatible connection with base URL `http://127.0.0.1:8000/v1`. The local proxy does not validate API keys; use a placeholder if the client requires one. Strategy names are pseudo-models published by the proxy, not models created or downloaded into Ollama. See the [deployment-specific connection table](CONFIGURATION.md#connect-open-webui) when WebUI runs in Docker or on another machine.
 
 ## Configuration
 
@@ -87,4 +91,4 @@ A judge can be biased or wrong, and the fallback heuristic favors nonempty compl
 
 The proxy is intended for trusted local use and has no inbound authentication, rate limiting, or global generation limit. Text chat is the supported workflow. Returned usage reflects only the selected upstream response, not total strategy cost. Configured cloud providers receive prompts and may incur charges.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the request flow and [PUBLISHING.md](PUBLISHING.md) for the initial repository push.
+See [CONFIGURATION.md](CONFIGURATION.md) for the complete setup and configuration reference, [ARCHITECTURE.md](ARCHITECTURE.md) for the request flow, and [PUBLISHING.md](PUBLISHING.md) for the initial repository push.

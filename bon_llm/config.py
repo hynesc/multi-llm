@@ -38,7 +38,6 @@ class SamplingConfig(BaseModel):
     temperature: float | None = None
     top_p: float | None = None
     max_tokens: int | None = None
-    timeout_seconds: float | None = None
 
     def apply(self, payload: dict[str, Any]) -> dict[str, Any]:
         updated = dict(payload)
@@ -71,7 +70,6 @@ class StrategyConfig(BaseModel):
     judge: JudgeConfig
     candidates: list[CandidateConfig] = Field(min_length=1)
     sampling: SamplingConfig = Field(default_factory=SamplingConfig)
-    passthrough: bool = False
 
 
 class AppConfig(BaseModel):

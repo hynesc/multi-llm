@@ -1,6 +1,6 @@
 # First GitHub push
 
-This folder is a standalone Git repository with a clean initial commit on `main`.
+This folder is a standalone Git repository with committed public source and setup documentation on `main`.
 Its `origin` is configured as `git@github.com:hynesc/multi-llm.git`.
 
 1. Create an empty GitHub repository named **multi-llm** under **hynesc**. Leave the options to add a README, license, and gitignore unchecked because this repository already has its initial commit.

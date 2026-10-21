@@ -150,7 +150,10 @@ class BestOfNEngine:
 
 
 def request_to_payload(request: ChatCompletionRequest) -> dict[str, Any]:
-    payload = request.model_dump(by_alias=True, exclude_none=True)
+    # Normalize the client's max_completion_tokens alias to max_tokens so
+    # strategy/candidate sampling overrides replace it rather than adding a
+    # conflicting second token-limit field to the provider request.
+    payload = request.model_dump(exclude_none=True)
     payload["messages"] = [message.model_dump(exclude_none=True) for message in request.messages]
     payload["stream"] = False
     return payload

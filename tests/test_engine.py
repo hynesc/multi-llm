@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from bon_llm.config import CandidateConfig, JudgeConfig, StrategyConfig
+from bon_llm.config import CandidateConfig, JudgeConfig, SamplingConfig, StrategyConfig
 from bon_llm.engine import (
     CandidateResult,
     expand_candidate_configs,
@@ -43,6 +43,30 @@ def test_expand_pool_honors_counts_and_weights() -> None:
     assert [candidate.model for candidate in candidates].count("fixed") == 1
     assert [candidate.model for candidate in candidates].count("heavy") == 3
     assert [candidate.model for candidate in candidates].count("light") == 1
+
+
+def test_candidate_sampling_overrides_openai_request_limits_without_duplicate_aliases() -> None:
+    strategy = StrategyConfig(
+        n=1,
+        candidates=[CandidateConfig(
+            provider="local", model="model-a",
+            sampling=SamplingConfig(max_tokens=128, temperature=0.9),
+        )],
+        judge=JudgeConfig(provider="local", model="judge-a"),
+        sampling=SamplingConfig(max_tokens=512, temperature=0.5),
+    )
+    request = ChatCompletionRequest(
+        model="bon/test",
+        max_completion_tokens=1024,
+        temperature=0.1,
+        messages=[{"role": "user", "content": "hello"}],
+    )
+
+    payload = expand_candidates(request, strategy)[0].payload
+
+    assert payload["max_tokens"] == 128
+    assert payload["temperature"] == 0.9
+    assert "max_completion_tokens" not in payload
 
 
 def test_parse_json_object_extracts_object_from_text() -> None:

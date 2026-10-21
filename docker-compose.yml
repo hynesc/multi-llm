@@ -17,6 +17,7 @@ services:
     depends_on:
       - bon-llm
     environment:
+      ENABLE_OLLAMA_API: "false"
       OPENAI_API_BASE_URL: http://bon-llm:8000/v1
       OPENAI_API_KEY: local-placeholder
     ports:

@@ -1,3 +1,4 @@
+# Provider URLs are OpenAI-compatible API bases, including /v1.
 providers:
   ollama:
     base_url: http://localhost:11434/v1
@@ -5,7 +6,9 @@ providers:
     timeout_seconds: 120
     max_retries: 1
 
+# These dictionary keys become pseudo-model IDs exposed to Open WebUI.
 strategies:
+  # Repeated sampling from one underlying model.
   bon/llama3.1:
     n: 3
     candidates:
@@ -19,6 +22,7 @@ strategies:
       temperature: 0.7
       top_p: 0.95
 
+  # One candidate from each of three underlying models.
   bon-pool/general:
     n: 3
     candidates:
